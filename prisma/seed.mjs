@@ -1,7 +1,114 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
+import { hashSync } from "bcryptjs";
 
-const prisma = new PrismaClient();
+const { Pool } = pg;
 
+// Crear adaptador Postgres
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
+// ==================== USUARIOS ====================
+const seedUsers = [
+  {
+    email: "admin@tienda.local",
+    password: "admin123",
+    role: "ADMIN",
+    profile: {
+      firstName: "Sofia",
+      lastName: "Admin",
+      phone: "+57 310 1234567",
+      bio: "Administrador del sistema",
+    },
+  },
+  {
+    email: "editor@tienda.local",
+    password: "editor123",
+    role: "EDITOR",
+    profile: {
+      firstName: "Carlos",
+      lastName: "Editor",
+      phone: "+57 310 7654321",
+      bio: "Editor de contenidos",
+    },
+  },
+  {
+    email: "viewer@tienda.local",
+    password: "viewer123",
+    role: "VIEWER",
+    profile: {
+      firstName: "Ana",
+      lastName: "Viewer",
+      phone: "+57 310 9876543",
+      bio: "Visualizador de datos",
+    },
+  },
+];
+
+// ==================== MENÚS ====================
+const seedMenus = [
+  {
+    name: "Main Admin Menu",
+    slug: "main-admin",
+    items: [
+      {
+        label: "Dashboard",
+        href: "/admin",
+        icon: "LayoutDashboard",
+      },
+      {
+        label: "Productos",
+        href: "/admin?view=products",
+        icon: "ShoppingCart",
+      },
+      {
+        label: "Pedidos",
+        href: "/admin?view=orders",
+        icon: "Receipt",
+      },
+      {
+        label: "Usuarios",
+        href: "/admin?view=users",
+        icon: "Users",
+      },
+      {
+        label: "Menús",
+        href: "/admin?view=menus",
+        icon: "Menu",
+      },
+    ],
+  },
+  {
+    name: "Footer Menu",
+    slug: "footer",
+    items: [
+      {
+        label: "Sobre Nosotros",
+        href: "/about",
+      },
+      {
+        label: "Contacto",
+        href: "/contact",
+      },
+      {
+        label: "Privacidad",
+        href: "/privacy",
+      },
+      {
+        label: "Términos",
+        href: "/terms",
+      },
+    ],
+  },
+];
+
+// ==================== PRODUCTOS ====================
 const seedProducts = [
   {
     slug: "aurora-lamp",
@@ -66,6 +173,55 @@ const seedProducts = [
 ];
 
 async function main() {
+  console.log("🌱 Iniciando seed de la base de datos...\n");
+
+  // ==================== CREAR USUARIOS ====================
+  console.log("👥 Creando usuarios...");
+  for (const user of seedUsers) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {},
+      create: {
+        email: user.email,
+        password: hashSync(user.password, 10),
+        role: user.role,
+        isActive: true,
+        profile: {
+          create: user.profile,
+        },
+      },
+    });
+    console.log(`   ✓ ${user.email} (${user.role})`);
+  }
+
+  // ==================== CREAR MENÚS ====================
+  console.log("\n📋 Creando menús...");
+  for (const menu of seedMenus) {
+    await prisma.menu.upsert({
+      where: { slug: menu.slug },
+      update: {
+        name: menu.name,
+      },
+      create: {
+        name: menu.name,
+        slug: menu.slug,
+        isActive: true,
+        items: {
+          create: menu.items.map((item, index) => ({
+            label: item.label,
+            href: item.href,
+            icon: item.icon || null,
+            order: index,
+            isActive: true,
+          })),
+        },
+      },
+    });
+    console.log(`   ✓ ${menu.name}`);
+  }
+
+  // ==================== CREAR PRODUCTOS ====================
+  console.log("\n🛍️  Creando productos...");
   for (const product of seedProducts) {
     await prisma.product.upsert({
       where: { slug: product.slug },
@@ -95,14 +251,19 @@ async function main() {
         },
       },
     });
+    console.log(`   ✓ ${product.name}`);
   }
 
-  console.log("Seed Prisma completado.");
+  console.log("\n✅ Seed completado exitosamente!");
+  console.log("\n📝 Credenciales de prueba:");
+  console.log("   Admin:  admin@tienda.local / admin123");
+  console.log("   Editor: editor@tienda.local / editor123");
+  console.log("   Viewer: viewer@tienda.local / viewer123");
 }
 
 main()
   .catch((error) => {
-    console.error(error);
+    console.error("❌ Error en seed:", error);
     process.exit(1);
   })
   .finally(async () => {

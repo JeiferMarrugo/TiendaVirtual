@@ -70,6 +70,7 @@ export function ProductShowcaseModal({
                     initial={{ opacity: 0.45, scale: 1.04 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.35 }}
+                    loading="eager"
                   />
 
                   <button
@@ -111,7 +112,7 @@ export function ProductShowcaseModal({
                           imageIndex === idx ? "border-accent" : "border-line hover:border-accent/70"
                         }`}
                       >
-                        <img src={image.url} alt={image.alt} className="h-full w-full object-cover" />
+                        <img src={image.url} alt={image.alt} className="h-full w-full object-cover" loading="lazy" />
                       </button>
                     ))}
                   </div>

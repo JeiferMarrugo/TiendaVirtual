@@ -3,11 +3,17 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import sharp from "sharp";
 
 type UploadBody = {
   dataUrl?: string;
   fileName?: string;
 };
+
+// Dimensiones estándar para normalizar todas las imágenes
+const PRODUCT_IMAGE_WIDTH = 400;
+const PRODUCT_IMAGE_HEIGHT = 400;
+const PRODUCT_IMAGE_QUALITY = 80;
 
 function sanitizeFileName(fileName: string) {
   return fileName
@@ -20,11 +26,11 @@ function sanitizeFileName(fileName: string) {
 }
 
 function extensionFromMime(mime: string) {
-  if (mime.includes("jpeg")) return "jpg";
+  // Priorizar webp para mejor compresión
   if (mime.includes("png")) return "png";
-  if (mime.includes("webp")) return "webp";
   if (mime.includes("gif")) return "gif";
-  return "jpg";
+  // Convertir JPEG y otros formatos a WebP para mejor ratio de compresión
+  return "webp";
 }
 
 export async function POST(request: Request) {
@@ -64,15 +70,50 @@ export async function POST(request: Request) {
     const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
     await mkdir(uploadDir, { recursive: true });
 
-    const fileBuffer = Buffer.from(base64Data, "base64");
+    const originalFileBuffer = Buffer.from(base64Data, "base64");
+    logger.info("POST /api/uploads/image", `Procesando imagen: ${PRODUCT_IMAGE_WIDTH}x${PRODUCT_IMAGE_HEIGHT}px`);
+
+    // Procesar y normalizar imagen
+    let processedBuffer: Buffer;
+    try {
+      let sharpImage = sharp(originalFileBuffer);
+      
+      // Obtener metadatos para procesamiento inteligente
+      const metadata = await sharpImage.metadata();
+      
+      // Redimensionar manteniendo aspect ratio y agregando padding si es necesario
+      processedBuffer = await sharpImage
+        .resize(PRODUCT_IMAGE_WIDTH, PRODUCT_IMAGE_HEIGHT, {
+          fit: "contain", // Mantiene aspect ratio sin recortar
+          background: { r: 255, g: 255, b: 255, alpha: 0 }, // Fondo transparente
+          position: "center",
+        })
+        .toFormat(ext as "webp" | "png" | "jpeg" | "jpg" | "gif", {
+          quality: PRODUCT_IMAGE_QUALITY,
+          progressive: true,
+        })
+        .toBuffer();
+
+      logger.info("POST /api/uploads/image", `Imagen procesada`, {
+        original: `${metadata.width}x${metadata.height}`,
+        normalized: `${PRODUCT_IMAGE_WIDTH}x${PRODUCT_IMAGE_HEIGHT}`,
+        originalSizeKb: Math.round(originalFileBuffer.length / 1024),
+        processedSizeKb: Math.round(processedBuffer.length / 1024),
+      });
+    } catch (processError) {
+      logger.warn("POST /api/uploads/image", `Error procesando imagen, usando original`, processError);
+      processedBuffer = originalFileBuffer;
+    }
+
     const filePath = path.join(uploadDir, finalFileName);
-    await writeFile(filePath, fileBuffer);
+    await writeFile(filePath, processedBuffer);
 
     done();
-    logger.success("POST /api/uploads/image", `Imagen guardada`, {
+    logger.success("POST /api/uploads/image", `Imagen guardada y normalizada`, {
       fileName: finalFileName,
       mime,
-      sizeKb: Math.round(fileBuffer.length / 1024),
+      sizeKb: Math.round(processedBuffer.length / 1024),
+      dimensions: `${PRODUCT_IMAGE_WIDTH}x${PRODUCT_IMAGE_HEIGHT}`,
       url: `/uploads/products/${finalFileName}`,
     });
 
@@ -80,6 +121,10 @@ export async function POST(request: Request) {
       ok: true,
       url: `/uploads/products/${finalFileName}`,
       storage: "local",
+      dimensions: {
+        width: PRODUCT_IMAGE_WIDTH,
+        height: PRODUCT_IMAGE_HEIGHT,
+      },
     });
   } catch (error) {
     done();

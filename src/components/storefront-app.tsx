@@ -363,11 +363,12 @@ export function StorefrontApp() {
                     transition={{ duration: 0.4, delay: index * 0.05 }}
                     className="overflow-hidden rounded-3xl border border-line bg-card-strong"
                   >
-                    <div className="relative h-52 overflow-hidden" style={{ background: product.accent }}>
+                    <div className="relative aspect-square overflow-hidden bg-neutral-200 dark:bg-neutral-800">
                       <img
                         src={product.images[0]?.url}
                         alt={product.images[0]?.alt ?? product.name}
-                        className="h-full w-full object-cover mix-blend-multiply opacity-90 transition duration-500 hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-500 hover:scale-110 will-change-transform"
+                        loading="lazy"
                       />
                     </div>
 
