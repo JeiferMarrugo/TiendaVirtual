@@ -19,8 +19,12 @@ export type SaleRecord = {
 export type SessionState = {
   shopperLoggedIn: boolean;
   shopperName: string;
+  shopperRole: string | null;
+  shopperToken: string | null;
   adminLoggedIn: boolean;
   adminName: string;
+  adminRole: string | null;
+  adminToken: string | null;
 };
 
 const SALES_KEY = "tienda-virtual-sales-v1";
@@ -29,9 +33,26 @@ const SESSION_KEY = "tienda-virtual-session-v1";
 const defaultSession: SessionState = {
   shopperLoggedIn: false,
   shopperName: "Cliente invitado",
+  shopperRole: null,
+  shopperToken: null,
   adminLoggedIn: false,
   adminName: "Admin Principal",
+  adminRole: null,
+  adminToken: null,
 };
+
+function normalizeSession(session: Partial<SessionState> | null | undefined): SessionState {
+  return {
+    shopperLoggedIn: !!session?.shopperLoggedIn,
+    shopperName: session?.shopperName || defaultSession.shopperName,
+    shopperRole: session?.shopperRole ?? null,
+    shopperToken: session?.shopperToken ?? null,
+    adminLoggedIn: !!session?.adminLoggedIn,
+    adminName: session?.adminName || defaultSession.adminName,
+    adminRole: session?.adminRole ?? null,
+    adminToken: session?.adminToken ?? null,
+  };
+}
 
 function canUseStorage() {
   return typeof window !== "undefined";
@@ -74,7 +95,8 @@ export function addSale(record: SaleRecord) {
 }
 
 export function readSession() {
-  return readJson<SessionState>(SESSION_KEY, defaultSession);
+  const raw = readJson<Partial<SessionState>>(SESSION_KEY, defaultSession);
+  return normalizeSession(raw);
 }
 
 export function updateSession(nextSession: SessionState) {

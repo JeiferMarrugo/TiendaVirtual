@@ -12,13 +12,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// Enums
-enum UserRole {
-  ADMIN
-  EDITOR
-  VIEWER
-}
-
 model Product {
   id          String         @id @default(cuid())
   slug        String         @unique
@@ -75,27 +68,40 @@ model SaleItem {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  password  String   // Será hasheada con bcrypt
-  role      UserRole @default(VIEWER)
-  isActive  Boolean  @default(true)
-  profile   Profile?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-}
-
-model Profile {
-  id        String   @id @default(cuid())
+  password  String
   firstName String
   lastName  String
   phone     String?
   avatar    String?
   bio       String?
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isActive  Boolean  @default(true)
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([profileId])
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GeneralSettings {
+  id          String   @id @default("default")
+  companyName String   @default("Maison Canvas")
+  nit         String?
+  logoUrl     String?
+  accentColor String   @default("#0e7490")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ==================== MENÚS DINÁMICOS ====================
@@ -120,8 +126,13 @@ model MenuItem {
   isActive  Boolean  @default(true)
   menuId    String
   menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    MenuItem?  @relation("MenuItemHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children  MenuItem[] @relation("MenuItemHierarchy")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([menuId])
+  @@index([parentId])
+  @@index([menuId, parentId, order])
 }

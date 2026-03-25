@@ -14,40 +14,53 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// ==================== PERFILES ====================
+const seedProfiles = [
+  {
+    name: "SUPERADMIN",
+    slug: "superadmin",
+    description: "Acceso total al sistema y administración global.",
+  },
+  {
+    name: "ADMIN",
+    slug: "admin",
+    description: "Acceso administrativo para gestión operativa.",
+  },
+  {
+    name: "VIEWS",
+    slug: "views",
+    description: "Acceso de consulta o visualización.",
+  },
+];
+
 // ==================== USUARIOS ====================
 const seedUsers = [
   {
     email: "admin@tienda.local",
     password: "admin123",
-    role: "ADMIN",
-    profile: {
-      firstName: "Sofia",
-      lastName: "Admin",
-      phone: "+57 310 1234567",
-      bio: "Administrador del sistema",
-    },
+    profileSlug: "superadmin",
+    firstName: "Sofia",
+    lastName: "Admin",
+    phone: "+57 310 1234567",
+    bio: "Administrador del sistema",
   },
   {
     email: "editor@tienda.local",
     password: "editor123",
-    role: "EDITOR",
-    profile: {
-      firstName: "Carlos",
-      lastName: "Editor",
-      phone: "+57 310 7654321",
-      bio: "Editor de contenidos",
-    },
+    profileSlug: "admin",
+    firstName: "Carlos",
+    lastName: "Editor",
+    phone: "+57 310 7654321",
+    bio: "Editor de contenidos",
   },
   {
     email: "viewer@tienda.local",
     password: "viewer123",
-    role: "VIEWER",
-    profile: {
-      firstName: "Ana",
-      lastName: "Viewer",
-      phone: "+57 310 9876543",
-      bio: "Visualizador de datos",
-    },
+    profileSlug: "views",
+    firstName: "Ana",
+    lastName: "Viewer",
+    phone: "+57 310 9876543",
+    bio: "Visualizador de datos",
   },
 ];
 
@@ -64,23 +77,59 @@ const seedMenus = [
       },
       {
         label: "Productos",
-        href: "/admin?view=products",
-        icon: "ShoppingCart",
+        href: "/admin?view=productos",
+        icon: "Package",
+        children: [
+          {
+            label: "Crear tipo de producto",
+            href: "/admin?view=productos-tipos",
+            icon: "Boxes",
+          },
+          {
+            label: "Categorias",
+            href: "/admin?view=productos-categorias",
+            icon: "Tag",
+          },
+          {
+            label: "Listado completo",
+            href: "/admin?view=productos-listado",
+            icon: "ListPlus",
+          },
+        ],
       },
       {
         label: "Pedidos",
-        href: "/admin?view=orders",
-        icon: "Receipt",
+        href: "/admin?view=pedidos",
+        icon: "ShoppingCart",
       },
       {
         label: "Usuarios",
-        href: "/admin?view=users",
+        href: "/admin?view=usuarios",
         icon: "Users",
+        children: [
+          {
+            label: "Listado de usuarios",
+            href: "/admin?view=usuarios-listado",
+            icon: "Users",
+          },
+        ],
       },
       {
         label: "Menús",
         href: "/admin?view=menus",
-        icon: "Menu",
+        icon: "MenuSquare",
+        children: [
+          {
+            label: "Administrador de menús",
+            href: "/admin?view=menus-listado",
+            icon: "MenuSquare",
+          },
+        ],
+      },
+      {
+        label: "Configuración",
+        href: "/admin?view=configuracion-general",
+        icon: "Settings",
       },
     ],
   },
@@ -175,29 +224,57 @@ const seedProducts = [
 async function main() {
   console.log("🌱 Iniciando seed de la base de datos...\n");
 
+  // ==================== CREAR PERFILES ====================
+  console.log("🪪 Creando perfiles...");
+  for (const profile of seedProfiles) {
+    await prisma.profile.upsert({
+      where: { slug: profile.slug },
+      update: {
+        name: profile.name,
+        description: profile.description,
+      },
+      create: profile,
+    });
+    console.log(`   ✓ ${profile.name}`);
+  }
+
   // ==================== CREAR USUARIOS ====================
   console.log("👥 Creando usuarios...");
   for (const user of seedUsers) {
+    const profile = await prisma.profile.findUnique({ where: { slug: user.profileSlug } });
+
+    if (!profile) {
+      throw new Error(`Perfil no encontrado para ${user.email}: ${user.profileSlug}`);
+    }
+
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {},
+      update: {
+        isActive: true,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        bio: user.bio,
+        profileId: profile.id,
+      },
       create: {
         email: user.email,
         password: hashSync(user.password, 10),
-        role: user.role,
         isActive: true,
-        profile: {
-          create: user.profile,
-        },
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        bio: user.bio,
+        profileId: profile.id,
       },
     });
-    console.log(`   ✓ ${user.email} (${user.role})`);
+    console.log(`   ✓ ${user.email} (${profile.name})`);
   }
 
   // ==================== CREAR MENÚS ====================
   console.log("\n📋 Creando menús...");
   for (const menu of seedMenus) {
-    await prisma.menu.upsert({
+    const savedMenu = await prisma.menu.upsert({
       where: { slug: menu.slug },
       update: {
         name: menu.name,
@@ -206,17 +283,43 @@ async function main() {
         name: menu.name,
         slug: menu.slug,
         isActive: true,
-        items: {
-          create: menu.items.map((item, index) => ({
-            label: item.label,
-            href: item.href,
-            icon: item.icon || null,
-            order: index,
-            isActive: true,
-          })),
-        },
       },
     });
+
+    await prisma.menuItem.deleteMany({ where: { menuId: savedMenu.id } });
+
+    let parentOrder = 0;
+    for (const parentItem of menu.items) {
+      const createdParent = await prisma.menuItem.create({
+        data: {
+          label: parentItem.label,
+          href: parentItem.href,
+          icon: parentItem.icon || null,
+          order: parentOrder,
+          isActive: true,
+          menuId: savedMenu.id,
+        },
+      });
+
+      parentOrder += 1;
+
+      const children = parentItem.children || [];
+      for (let childOrder = 0; childOrder < children.length; childOrder += 1) {
+        const child = children[childOrder];
+        await prisma.menuItem.create({
+          data: {
+            label: child.label,
+            href: child.href,
+            icon: child.icon || null,
+            order: childOrder,
+            isActive: true,
+            menuId: savedMenu.id,
+            parentId: createdParent.id,
+          },
+        });
+      }
+    }
+
     console.log(`   ✓ ${menu.name}`);
   }
 

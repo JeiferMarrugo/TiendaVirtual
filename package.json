@@ -11,8 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "node prisma/seed.mjs",
-    "db:init": "prisma db push && npm run db:seed",
-    "db:reset": "prisma migrate reset --force && npm run db:seed",
+    "db:init": "prisma db push && prisma generate && npm run db:seed",
+    "db:reset": "prisma migrate reset --force && prisma generate && npm run db:seed",
     "db:seed": "node prisma/seed.mjs"
   },
   "dependencies": {

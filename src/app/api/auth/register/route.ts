@@ -17,7 +17,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as RegisterBody;
 
     // Validaciones
-    if (!body.email || !body.password || !body.firstName || !body.lastName) {
+    const firstName = body.firstName?.trim();
+    const lastName = body.lastName?.trim();
+
+    if (!body.email || !body.password || !firstName || !lastName) {
       return NextResponse.json(
         { ok: false, message: "Faltan campos requeridos" },
         { status: 400 }
@@ -44,17 +47,24 @@ export async function POST(request: Request) {
     }
 
     // Crear usuario
+    const defaultProfile = await prisma.profile.upsert({
+      where: { slug: "views" },
+      update: {},
+      create: {
+        name: "VIEWS",
+        slug: "views",
+        description: "Perfil de consulta o visualización.",
+      },
+    });
+
     const hashedPassword = hashPassword(body.password);
     const user = await prisma.user.create({
       data: {
         email: body.email.toLowerCase(),
         password: hashedPassword,
-        profile: {
-          create: {
-            firstName: body.firstName,
-            lastName: body.lastName,
-          },
-        },
+        firstName,
+        lastName,
+        profileId: defaultProfile.id,
       },
       include: {
         profile: true,
@@ -65,13 +75,13 @@ export async function POST(request: Request) {
     const token = generateToken({
       userId: user.id,
       email: user.email,
-      role: user.role,
+      role: user.profile.name,
     });
 
     done();
     logger.success("POST /api/auth/register", "Usuario registrado", {
       email: user.email,
-      role: user.role,
+      role: user.profile.name,
     });
 
     return NextResponse.json({
@@ -79,7 +89,11 @@ export async function POST(request: Request) {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        avatar: user.avatar,
+        bio: user.bio,
         profile: user.profile,
       },
       token,

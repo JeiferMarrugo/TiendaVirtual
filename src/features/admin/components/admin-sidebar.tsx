@@ -2,8 +2,9 @@
 
 import clsx from "clsx";
 import { BellRing, ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SidebarItem } from "@/features/admin/config/sidebar";
+import { useGeneralSettings } from "@/components/general-settings-provider";
 
 type AdminSidebarProps = {
   isOpen: boolean;
@@ -20,7 +21,15 @@ export function AdminSidebar({
   activeView,
   onSelectView,
 }: AdminSidebarProps) {
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["productos"]));
+  const { settings } = useGeneralSettings();
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const defaults = new Set(
+      groups.filter((group) => (group.children?.length ?? 0) > 0).map((group) => group.id),
+    );
+    setExpandedMenus(defaults);
+  }, [groups]);
 
   const toggleMenu = (itemId: string) => {
     const newExpanded = new Set(expandedMenus);
@@ -111,8 +120,17 @@ export function AdminSidebar({
       <div className={clsx("flex items-center", isOpen ? "justify-between" : "justify-center")}>
         {isOpen ? (
           <div className="px-2">
+            {settings.logoUrl ? (
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-card p-2 shadow-sm">
+                <img
+                  src={settings.logoUrl}
+                  alt={`Logo de ${settings.companyName}`}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+            ) : null}
             <p className="text-muted text-[10px] uppercase tracking-[0.35em]">Administracion</p>
-            <h1 className="admin-title mt-1 text-xl">Maison Canvas</h1>
+            <h1 className="admin-title mt-1 text-xl">{settings.companyName}</h1>
           </div>
         ) : null}
 

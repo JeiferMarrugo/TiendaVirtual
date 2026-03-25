@@ -34,17 +34,36 @@ export function AdminHeader({ session, lastSync, onRefresh, onToggleSession }: A
           <Link href="/" className="rounded-full border border-line bg-card-strong px-4 py-2 text-sm text-foreground">
             Ver tienda
           </Link>
-          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-card-strong px-4 py-2 text-sm text-foreground">
-            <UserRound size={16} />
-            {session.adminName}
-          </div>
-          <button
-            onClick={onToggleSession}
-            className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm text-on-primary"
-          >
-            {session.adminLoggedIn ? <LogOut size={16} /> : <LogIn size={16} />}
-            {session.adminLoggedIn ? "Logout" : "Login"}
-          </button>
+          {session.adminLoggedIn ? (
+            <details className="relative">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-card-strong px-4 py-2 text-sm text-foreground">
+                <UserRound size={16} />
+                {session.adminName}
+              </summary>
+              <div className="absolute right-0 z-10 mt-2 min-w-[220px] rounded-2xl border border-line bg-card p-2 shadow-xl">
+                <p className="px-3 py-2 text-xs uppercase tracking-[0.2em] text-muted">Sesión activa</p>
+                <div className="rounded-xl bg-card-strong px-3 py-2 text-sm text-foreground">
+                  <p className="font-semibold">{session.adminName}</p>
+                  <p className="text-xs text-muted">Rol: {session.adminRole || "N/A"}</p>
+                </div>
+                <button
+                  onClick={onToggleSession}
+                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-3 py-2 text-sm text-on-primary"
+                >
+                  <LogOut size={15} />
+                  Cerrar sesión
+                </button>
+              </div>
+            </details>
+          ) : (
+            <button
+              onClick={onToggleSession}
+              className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm text-on-primary"
+            >
+              <LogIn size={16} />
+              Login
+            </button>
+          )}
         </div>
       </div>
     </header>

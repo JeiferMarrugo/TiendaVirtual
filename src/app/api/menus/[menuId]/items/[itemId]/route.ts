@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { extractTokenFromHeader, verifyToken } from "@/lib/auth";
+import { extractTokenFromHeader, verifyToken, isAdminRole } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 type UpdateMenuItemBody = {
@@ -8,6 +8,7 @@ type UpdateMenuItemBody = {
   href?: string;
   icon?: string;
   order?: number;
+  parentId?: string | null;
   isActive?: boolean;
 };
 
@@ -16,7 +17,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ menuId: string; itemId: string }> }
 ) {
-  const { itemId } = await params;
+  const { menuId, itemId } = await params;
   const done = logger.timer("PUT /api/menus/[menuId]/items/[itemId]", "Item actualizado");
 
   try {
@@ -31,7 +32,7 @@ export async function PUT(
     }
 
     const payload = verifyToken(token);
-    if (!payload || payload.role !== "ADMIN") {
+    if (!payload || !isAdminRole(payload.role)) {
       return NextResponse.json(
         { ok: false, message: "Acceso denegado" },
         { status: 403 }
@@ -40,6 +41,22 @@ export async function PUT(
 
     const body = (await request.json()) as UpdateMenuItemBody;
 
+    if (body.parentId) {
+      const parent = await prisma.menuItem.findFirst({
+        where: {
+          id: body.parentId,
+          menuId,
+        },
+      });
+
+      if (!parent) {
+        return NextResponse.json(
+          { ok: false, message: "El item padre no existe en este menú" },
+          { status: 400 }
+        );
+      }
+    }
+
     const item = await prisma.menuItem.update({
       where: { id: itemId },
       data: {
@@ -47,6 +64,7 @@ export async function PUT(
         href: body.href || undefined,
         icon: body.icon || undefined,
         order: body.order !== undefined ? body.order : undefined,
+        parentId: body.parentId !== undefined ? body.parentId : undefined,
         isActive: body.isActive !== undefined ? body.isActive : undefined,
       },
     });
@@ -94,7 +112,7 @@ export async function DELETE(
     }
 
     const payload = verifyToken(token);
-    if (!payload || payload.role !== "ADMIN") {
+    if (!payload || !isAdminRole(payload.role)) {
       return NextResponse.json(
         { ok: false, message: "Acceso denegado" },
         { status: 403 }

@@ -26,6 +26,8 @@ import {
 } from "@/lib/store-data";
 import { addSale, CartItem, getDefaultSession, readSession, updateSession } from "@/lib/storage";
 import { LoadingOverlay } from "@/components/loading-overlay";
+import { SessionAuthModal } from "@/components/session-auth-modal";
+import { useGeneralSettings } from "@/components/general-settings-provider";
 
 type CartProduct = CartItem & {
   name: string;
@@ -39,6 +41,7 @@ const heroStats = [
 ];
 
 export function StorefrontApp() {
+  const { settings } = useGeneralSettings();
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [productList, setProductList] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -47,6 +50,8 @@ export function StorefrontApp() {
   const [session, setSession] = useState(getDefaultSession());
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [shopperAuthMode, setShopperAuthMode] = useState<"login" | "register">("login");
 
   useEffect(() => {
     setSession(readSession());
@@ -88,17 +93,37 @@ export function StorefrontApp() {
   );
 
   function toggleShopperSession() {
+    if (session.shopperLoggedIn) {
+      const nextSession = {
+        ...session,
+        shopperLoggedIn: false,
+        shopperName: "Cliente invitado",
+        shopperRole: null,
+        shopperToken: null,
+      };
+
+      setSession(nextSession);
+      updateSession(nextSession);
+      toast.success("Sesión de cliente cerrada.");
+      return;
+    }
+
+    setShopperAuthMode("login");
+    setIsLoginModalOpen(true);
+  }
+
+  function onShopperLoginSuccess(payload: { token: string; role: string; fullName: string }) {
     const nextSession = {
       ...session,
-      shopperLoggedIn: !session.shopperLoggedIn,
-      shopperName: session.shopperLoggedIn ? "Cliente invitado" : "Valentina",
+      shopperLoggedIn: true,
+      shopperName: payload.fullName,
+      shopperRole: payload.role,
+      shopperToken: payload.token,
     };
 
     setSession(nextSession);
     updateSession(nextSession);
-    toast.success(
-      nextSession.shopperLoggedIn ? "Sesion de cliente iniciada." : "Sesion de cliente cerrada.",
-    );
+    toast.success("Sesión de cliente iniciada correctamente.");
   }
 
   function addToCart(productId: string) {
@@ -148,7 +173,10 @@ export function StorefrontApp() {
 
   function checkout() {
     if (!session.shopperLoggedIn) {
-      toast.error("Inicia sesion en la tienda antes de finalizar la compra.");
+      setCartOpen(false);
+      setShopperAuthMode("login");
+      setIsLoginModalOpen(true);
+      toast.error("Primero debes iniciar sesión o crear tu cuenta para comprar.");
       return;
     }
 
@@ -196,16 +224,27 @@ export function StorefrontApp() {
             <p className="text-muted text-xs uppercase tracking-[0.35em]">
               Tienda Virtual
             </p>
-            <Link href="/" className="section-title text-3xl font-semibold text-foreground">
-              Maison Canvas
-            </Link>
+            <div className="flex items-center gap-3">
+              {settings.logoUrl ? (
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-card-strong p-2 shadow-sm sm:h-16 sm:w-16">
+                  <img
+                    src={settings.logoUrl}
+                    alt={`Logo de ${settings.companyName}`}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              ) : null}
+              <Link href="/" className="section-title text-3xl font-semibold text-foreground">
+                {settings.companyName}
+              </Link>
+            </div>
           </div>
 
           <nav className="text-muted hidden items-center gap-8 text-sm md:flex">
             <a href="#coleccion">Coleccion</a>
             <a href="#ediciones">Ediciones</a>
             <a href="#experiencia">Experiencia</a>
-            <Link href="/admin">Admin</Link>
+            <Link href="/admin/login">Admin</Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -265,7 +304,7 @@ export function StorefrontApp() {
                     <ArrowRight size={16} />
                   </a>
                   <Link
-                    href="/admin"
+                    href="/admin/login"
                     className="inline-flex items-center gap-2 rounded-full border border-line bg-card-strong px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-card"
                   >
                     Abrir panel admin
@@ -518,6 +557,15 @@ export function StorefrontApp() {
       </aside>
 
       <LoadingOverlay visible={isCheckingOut} message="Procesando tu compra..." />
+      <SessionAuthModal
+        isOpen={isLoginModalOpen}
+        title="Ingreso de cliente"
+        subtitle="Inicia sesión o crea una cuenta para finalizar tu compra."
+        allowRegister
+        initialMode={shopperAuthMode}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSuccess={onShopperLoginSuccess}
+      />
       <ProductShowcaseModal
         product={selectedProduct}
         isOpen={selectedProduct !== null}

@@ -2,6 +2,7 @@
 
 import { ThemeProvider, useTheme } from "next-themes";
 import { Toaster } from "sonner";
+import { GeneralSettingsProvider } from "@/components/general-settings-provider";
 
 function ToasterBridge() {
   const { resolvedTheme } = useTheme();
@@ -29,8 +30,10 @@ function ToasterBridge() {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      {children}
-      <ToasterBridge />
+      <GeneralSettingsProvider>
+        {children}
+        <ToasterBridge />
+      </GeneralSettingsProvider>
     </ThemeProvider>
   );
 }

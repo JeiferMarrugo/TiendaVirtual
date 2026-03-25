@@ -43,33 +43,36 @@ npm run prisma:studio
 
 Después de correr `db:seed`, puedes usar estas credenciales:
 
-| Email | Contraseña | Rol |
-|-------|-----------|-----|
-| `admin@tienda.local` | `admin123` | ADMIN |
-| `editor@tienda.local` | `editor123` | EDITOR |
-| `viewer@tienda.local` | `viewer123` | VIEWER |
+| Email | Contraseña | Perfil |
+|-------|-----------|--------|
+| `admin@tienda.local` | `admin123` | SUPERADMIN |
+| `editor@tienda.local` | `editor123` | ADMIN |
+| `viewer@tienda.local` | `viewer123` | VIEWS |
 
 ---
 
 ## 📋 Modelos de BD
+
+### Profile (catálogo de roles — solo 3 filas)
+```typescript
+- id (string, PK)
+- name (string, unique)        // "SUPERADMIN" | "ADMIN" | "VIEWS"
+- slug (string, unique)        // "superadmin" | "admin" | "views"
+- description (string, opcional)
+- users (Relación con User[])
+- createdAt, updatedAt
+```
 
 ### User
 ```typescript
 - id (string, PK)
 - email (string, unique)
 - password (string, hasheada)
-- role (ADMIN | EDITOR | VIEWER)
-- isActive (boolean)
-- profile (Relación con Profile)
-- createdAt, updatedAt
-```
-
-### Profile
-```typescript
-- id (string, PK)
 - firstName, lastName (string)
-- phone, bio, avatar (opcional)
-- userId (FK)
+- phone, avatar, bio (opcional)
+- isActive (boolean)
+- profileId (FK → Profile)
+- profile (Relación con Profile)
 - createdAt, updatedAt
 ```
 
@@ -102,19 +105,22 @@ Después de correr `db:seed`, puedes usar estas credenciales:
 - `POST /api/auth/login` - Login con email/password
 - `POST /api/auth/register` - Registrar nuevo usuario
 
-### Usuarios (requiere auth + ADMIN role)
+### Usuarios (requiere auth + ADMIN/SUPERADMIN role)
 - `GET /api/users` - Listar todos
 - `POST /api/users` - Crear usuario
 - `PUT /api/users/[id]` - Actualizar usuario
 - `DELETE /api/users/[id]` - Eliminar usuario
 
-### Menús (GET es público, resto requiere auth + ADMIN)
+### Perfiles (catálogo de roles)
+- `GET /api/profiles` - Listar perfiles (público)
+
+### Menús (GET es público, resto requiere auth + ADMIN/SUPERADMIN)
 - `GET /api/menus` - Listar menús
 - `POST /api/menus` - Crear menú
 - `PUT /api/menus/[menuId]` - Actualizar menú
 - `DELETE /api/menus/[menuId]` - Eliminar menú
 
-### Items de Menús (requiere auth + ADMIN role)
+### Items de Menús (requiere auth + ADMIN/SUPERADMIN role)
 - `POST /api/menus/[menuId]/items` - Crear item
 - `PUT /api/menus/[menuId]/items/[itemId]` - Actualizar item
 - `DELETE /api/menus/[menuId]/items/[itemId]` - Eliminar item
@@ -124,10 +130,10 @@ Después de correr `db:seed`, puedes usar estas credenciales:
 ## 🚀 Flujo de Autenticación
 
 1. Usuario hace login: `POST /api/auth/login`
-2. Backend retorna JWT token
+2. Backend retorna JWT token con `role = profile.name` (ej. "SUPERADMIN")
 3. Cliente guarda token en localStorage
 4. Para requests protegidas, enviar: `Authorization: Bearer <token>`
-5. Backend valida token y permisos (role)
+5. Backend valida token y comprueba `role === "ADMIN" || role === "SUPERADMIN"`
 
 ---
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { extractTokenFromHeader, verifyToken } from "@/lib/auth";
+import { extractTokenFromHeader, verifyToken, isAdminRole } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 // GET /api/menus - Listar todos los menús
@@ -9,9 +9,14 @@ export async function GET() {
     const menus = await prisma.menu.findMany({
       include: {
         items: {
-          orderBy: {
-            order: "asc",
-          },
+          orderBy: [
+            {
+              parentId: "asc",
+            },
+            {
+              order: "asc",
+            },
+          ],
         },
       },
       orderBy: {
@@ -58,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     const payload = verifyToken(token);
-    if (!payload || payload.role !== "ADMIN") {
+    if (!payload || !isAdminRole(payload.role)) {
       return NextResponse.json(
         { ok: false, message: "Acceso denegado" },
         { status: 403 }
@@ -130,7 +135,7 @@ export async function PUT(request: Request) {
     }
 
     const payload = verifyToken(token);
-    if (!payload || payload.role !== "ADMIN") {
+    if (!payload || !isAdminRole(payload.role)) {
       return NextResponse.json(
         { ok: false, message: "Acceso denegado" },
         { status: 403 }
@@ -193,7 +198,7 @@ export async function DELETE(request: Request) {
     }
 
     const payload = verifyToken(token);
-    if (!payload || payload.role !== "ADMIN") {
+    if (!payload || !isAdminRole(payload.role)) {
       return NextResponse.json(
         { ok: false, message: "Acceso denegado" },
         { status: 403 }

@@ -48,13 +48,13 @@ export async function POST(request: Request) {
     const token = generateToken({
       userId: user.id,
       email: user.email,
-      role: user.role,
+      role: user.profile.name,
     });
 
     done();
     logger.success("POST /api/auth/login", "Login exitoso", {
       email: user.email,
-      role: user.role,
+      role: user.profile.name,
     });
 
     return NextResponse.json({
@@ -62,7 +62,11 @@ export async function POST(request: Request) {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        avatar: user.avatar,
+        bio: user.bio,
         profile: user.profile,
       },
       token,

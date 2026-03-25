@@ -18,6 +18,10 @@ export interface JWTPayload {
   role: string;
 }
 
+export function isAdminRole(role?: string | null): boolean {
+  return role === "ADMIN" || role === "SUPERADMIN";
+}
+
 export function generateToken(payload: JWTPayload): string {
   return sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
